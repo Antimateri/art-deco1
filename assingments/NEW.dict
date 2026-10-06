@@ -1,0 +1,118 @@
+{
+    "E": {
+        "type": "T",
+        "direction": "U"
+    },
+    "A": {
+        "type": "E",
+        "direction": "U"
+    },
+    "B": {
+        "type": "P",
+        "direction": "U"
+    },
+    "O": {
+        "type": "T",
+        "direction": "D"
+    },
+    "R": {
+        "type": "E",
+        "direction": "D"
+    },
+    "I": {
+        "type": "P",
+        "direction": "D"
+    },
+    "Y": {
+        "type": "T",
+        "direction": "S"
+    },
+    "S": {
+        "type": "D",
+        "direction": "S"
+    },
+    "N": {
+        "type": "P",
+        "direction": "S"
+    },
+    "D": {
+        "type": "T",
+        "direction": "U",
+        "filled": true
+    },
+    "P": {
+        "type": "E",
+        "direction": "U",
+        "filled": true
+    },
+    "Q": {
+        "type": "P",
+        "direction": "U",
+        "filled": true
+    },
+    "X": {
+        "type": "T",
+        "direction": "D",
+        "filled": true
+    },
+    "J": {
+        "type": "E",
+        "direction": "D",
+        "filled": true
+    },
+    "U": {
+        "type": "P",
+        "direction": "D",
+        "filled": true
+    },
+    "G": {
+        "type": "T",
+        "direction": "S",
+        "filled": true
+    },
+    "M": {
+        "type": "P",
+        "direction": "S",
+        "filled": true
+    },
+    "C": {
+        "type": "T",
+        "direction": "U",
+        "center": true
+    },
+    "T": {
+        "type": "E",
+        "direction": "U",
+        "center": true
+    },
+    "F": {
+        "type": "P",
+        "direction": "U",
+        "center": true
+    },
+    "H": {
+        "type": "T",
+        "direction": "D",
+        "center": true
+    },
+    "L": {
+        "type": "E",
+        "direction": "D",
+        "center": true
+    },
+    "W": {
+        "type": "T",
+        "direction": "S",
+        "center": true
+    },
+    "Z": {
+        "type": "D",
+        "direction": "S",
+        "center": true
+    },
+    "K": {
+        "type": "P",
+        "direction": "S",
+        "center": true
+    }
+}
