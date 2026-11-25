@@ -1,12 +1,16 @@
+from ast import Tuple
 import tkinter as tk
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 import json
 import turtle
 import math
 import random
+from typing import List, Literal, Tuple
 from PIL import Image, ImageTk
 import pyglet, os
 import os.path
+
+#pato@name@com@3 comida@verb@ind-Fut@imp-Past
 
 pyglet.font.add_file(os.path.join('fonts','AutobusOmnibus-K7127.ttf'))
 pyglet.font.add_file(os.path.join('fonts','FairfaxHD.ttf'))
@@ -30,7 +34,99 @@ def standart_unfill_value(layer_size):
     return max(min(_standart_unfill_value_, layer_size//10),1)
 
 class DraWord:
-    def __init__(self, word, letters, initial_layer = _initial_layer_, layer_size = _layer_size_):
+
+    class WordModifiers:
+        def __init__(self, 
+                     #wrap: Literal["sub", "comp"] = None, 
+                     #wrap_ending: Tuple[Literal["U", "D"], Literal["C", "CC", "composition", None]] = None,
+                     negation: bool = False
+                     ):
+            self.negation = negation
+            self.modifiers = []
+            #if wrap is not None:
+            #    self.modifiers.append((1, 1 if wrap=="sub" else 0, wrap, "S"))
+            #if wrap_ending is not None:
+            #    self.modifiers.append((1, 1 if wrap_ending[0]=="CC" else 0, wrap_ending[1], wrap_ending[0]))
+
+        def add_modifier(self, priority, symbol, dir):
+            self.modifiers.append((priority, symbol, dir))
+        
+        #def get_layers(self, dir):
+        #    return len(set([m[0] for m in self.modifiers if m[3]==dir]))
+
+        def get_max_priority(self, dir = None):
+            print(self.modifiers)
+            return max([m[0] for m in self.modifiers if dir is None or m[2]==dir], default=0)
+
+        def get_layers(self, dir):
+            return self.get_max_priority(dir)
+
+        def get_modifiers(self):
+            self.modifiers.sort(key=lambda x: x[0], reverse=True)
+            return self.modifiers
+
+    class NameModifiers(WordModifiers):
+        def __init__(self, 
+                     name: Literal["ind", "com", "prop"] = [],
+                     num: int = 0,
+                     negation: bool = False):
+            super().__init__(negation=negation)
+            #a bit of a hack
+            priority = self.get_max_priority("U")+1
+            if name[0]!="i":
+                self.add_modifier(priority, "E", "U")
+                priority += 1
+            if name[1]=="r":
+                self.add_modifier(priority, "E", "U")
+                
+            priority = self.get_max_priority("D")+1
+            if num >= 1:
+                self.add_modifier(priority, "E", "D")
+                priority += 1
+            if num >= 2:
+                self.add_modifier(priority, "E", "D")
+
+    class AdModifiers(WordModifiers):
+        def __init__(self, 
+                     adv: bool = False,
+                     negation: bool = False
+                    ):
+            super().__init__(negation=negation)
+            self.adv = adv
+            self.add_modifier(self.get_max_priority("S")+2, "t", "S")
+
+        def get_max_priority(self, dir = None):
+            if (dir is None or dir == "S") and self.adv:
+                return super().get_max_priority(dir)-2
+            else:
+                return super().get_max_priority(dir)
+
+    class VerbModifiers(WordModifiers):
+        def __init__(self, 
+                     time = None, #List[Tuple[Literal["ind", "sub", "imp"], Literal["past", "pres", "fut"]]]
+                     negation: bool = False
+                    ):
+            super().__init__(negation=negation)
+            if time is None or len(time) == 0:
+                self.add_modifier(self.get_max_priority()+1, "D", "U")
+            else:
+                modes = {"ind": "Tl", "sub": "Ll", "imp": "tI"}
+                times = {"past": "U", "pres": "S", "fut": "D"}
+                sizes = {"U": 0, "S": 0, "D": 0}
+                for i,t in enumerate(time):
+                    sizes[times[t[1]]] = 2*i
+                print(sizes)
+                print(time)
+                for t in time:
+                    i = max(self.get_max_priority("D"), self.get_max_priority("U"))
+                    for m in modes[t[0]]:
+                        i+=1
+                        self.add_modifier(i, m, times[t[1]])
+                    for dir in ["U", "D", "S"]:
+                        if dir != times[t[1]] and sizes[dir] > i-2:
+                            self.add_modifier(i-1, "l", dir)
+
+    def __init__(self, word, letters, initial_layer = _initial_layer_, layer_size = _layer_size_, modifiers: WordModifiers = None):
         self.x_offset = 0
         self.y_offset = 0
         self.__initial_layer = initial_layer
@@ -42,13 +138,19 @@ class DraWord:
             'D': self.__initial_pos_down
         }
         self.__code = {
-            'T': self.__draw_triangle,
-            'E': self.__draw_empty_triangle,
-            'D': self.__draw_diamon,
-            'P': self.__draw_pentagon
+            'T': self.__draw_triangle, #\/
+            't': self.__draw_small_triangle,
+            'E': self.__draw_empty_triangle, #\ /
+            'D': self.__draw_diamond, #<>
+            'P': self.__draw_pentagon,  #--------------->/  \
+            'L': self.__draw_line, #---                 #\  /
+            'l': self.__draw_small_line, #-             # \/
+            'I': self.__draw_closed_small_triangle #| |
+                                                   #\/
         }
         self.word=word
         self.letters=letters
+        self.modifiers = modifiers
 
     def set_offsets(self, x_offset, y_offset):
         self.x_offset = x_offset
@@ -68,6 +170,11 @@ class DraWord:
 
     def __get_length(self, layer):
         return 2**(1/2)*self.__get_size(layer)/2/math.cos(math.degrees(-_triangle_angle_))
+
+    def __get_layers_modifier(self, dir = None):
+        if self.modifiers is None:
+            return 0
+        return self.modifiers.get_layers(dir)
 
     def __initial_pos_up(self, t, layer):
         t.penup()
@@ -133,6 +240,30 @@ class DraWord:
 
         self.__initial_pos(t)
 
+    def __draw_small_triangle(self, t, layer, dir, filled = _standart_unfill_value_, center = False):        
+        t.pensize(filled)
+
+        if dir=='S':
+            self.__draw_small_triangle(t, layer, 'L', filled, center)
+            self.__draw_small_triangle(t, layer, 'R', filled, center)
+            return
+        
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.left(90+45)
+        t.forward(self.__get_size(layer)/2)
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.right(90+45)
+        t.forward(self.__get_size(layer)/2)
+        
+        if center:
+            self.__initial[dir](t, layer)
+            t.pendown()
+            t.backward(self.__get_size(layer)-self.__get_size(layer-1))
+
+        self.__initial_pos(t)
+
     def __draw_empty_triangle(self, t, layer, dir, filled = _standart_unfill_value_, center = False):
         t.pensize(filled)
 
@@ -162,7 +293,7 @@ class DraWord:
 
         self.__initial_pos(t)
 
-    def __draw_diamon(self, t, layer, _, filled = _standart_unfill_value_, center = False):
+    def __draw_diamond(self, t, layer, _, filled = _standart_unfill_value_, center = False):
         self.__draw_triangle(t, layer, 'U', filled, center)
         self.__draw_triangle(t, layer, 'D', filled, center)
         self.__draw_triangle(t, layer, 'S', filled, center)
@@ -196,6 +327,84 @@ class DraWord:
             t.backward(self.__get_size(layer)-self.__get_size(layer-1))
 
         self.__initial_pos(t)
+
+    def __draw_closed_small_triangle(self, t, layer, dir, filled = _standart_unfill_value_, center = False):
+        t.pensize(filled)
+
+        if dir=='S':
+            self.__draw_closed_small_triangle(t, layer, 'L', filled, center)
+            self.__draw_closed_small_triangle(t, layer, 'R', filled, center)
+            return
+        
+        length = (self.__get_length(layer)-self.__get_length(layer-1))/math.sqrt(2)
+
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.left(90+45)
+        t.forward(length*2)
+        t.left(90-45)
+        t.forward(length*2)
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.right(90+45)
+        t.forward(length*2)
+        t.right(90-45)
+        t.forward(length*2)
+        
+        if center:
+            self.__initial[dir](t, layer)
+            t.pendown()
+            t.backward(self.__get_size(layer)-self.__get_size(layer-1))
+
+        self.__initial_pos(t)
+
+    def __draw_line(self, t, layer, dir, filled = _standart_unfill_value_, center = False):   
+        t.pensize(filled)
+
+        if dir=='S':
+            self.__draw_line(t, layer, 'L', filled, center)
+            self.__draw_line(t, layer, 'R', filled, center)
+            return
+        
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.left(90)
+        t.forward(self.__get_size(layer)/2)
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.right(90)
+        t.forward(self.__get_size(layer)/2)
+        
+        if center:
+            self.__initial[dir](t, layer)
+            t.pendown()
+            t.backward(self.__get_size(layer)-self.__get_size(layer-1))
+
+        self.__initial_pos(t)
+
+    def __draw_small_line(self, t, layer, dir, filled = _standart_unfill_value_, center = False):          
+        t.pensize(filled)
+
+        if dir=='S':
+            self.__draw_small_line(t, layer, 'L', filled, center)
+            self.__draw_small_line(t, layer, 'R', filled, center)
+            return
+        
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.left(90)
+        t.forward(self.__get_size(layer)/16)
+        self.__initial[dir](t, layer)
+        t.pendown()
+        t.right(90)
+        t.forward(self.__get_size(layer)/16)
+        
+        if center:
+            self.__initial[dir](t, layer)
+            t.pendown()
+            t.backward(self.__get_size(layer)-self.__get_size(layer-1))
+
+        self.__initial_pos(t)
     
     def draw_word(self, t, letters):
         self.__initial_pos(t)
@@ -220,7 +429,11 @@ class DraWord:
                 if shape_type in self.__code:
                     self.__code[shape_type](t, layer, direction, filled, center)
                 layer += 1
-        self.__draw_diamon(t, layer, '', filled=standart_fill_value(self.layer_size)*1.5)
+        self.__draw_diamond(t, layer, '', filled=standart_fill_value(self.layer_size)*1.5)
+        if self.modifiers is not None:
+            for extra_layer, shape, dir in self.modifiers.get_modifiers():
+                if shape in self.__code:
+                    self.__code[shape](t, layer+extra_layer, dir, filled=standart_unfill_value(self.layer_size), center=True) 
         return self
     
     def __get_n_layers(self, letters):
@@ -236,8 +449,8 @@ class DraWord:
                 layer += 1
         return layer
     
-    def get_distance_from_center(self, letters):
-        return self.__get_length(self.__get_n_layers(letters))
+    def get_distance_from_center(self, letters, dir = None):
+        return self.__get_length(self.__get_n_layers(letters)+self.__get_layers_modifier(dir))
 
 window = tk.Tk()
 
@@ -366,6 +579,25 @@ def save():
     with open(filepath, 'w') as output_file:
         output_file.write(json.dumps(out, indent=4))
 
+def generate_modifiers(word: str) -> DraWord.WordModifiers:
+    data = word.lower().split('@')
+    print(data)
+    if len(data) == 1:
+        return None
+    if data[1] == 'name':
+        return DraWord.NameModifiers(name=data[2] if len(data) > 2 else None, num=int(data[3]) if len(data) > 3 else 0)
+    elif data[1] in ['adv', 'adj']:
+        return DraWord.AdModifiers(adv=data[1] == 'adv' if len(data) >= 2 else False)
+    elif data[1] == 'verb':
+        time = None
+        if len(data) > 2:
+            time = []
+            for t in data[2:]:
+                mode, tense = t.split('-')
+                time.append((mode, tense))
+        return DraWord.VerbModifiers(time=time)
+    return None
+
 def generate():
     letters = generate_json()
     sentence_window = tk.Tk()
@@ -382,7 +614,6 @@ def generate():
     sentence_entry.pack()
     def generate_sentence():
         sentence = sentence_entry.get().upper()
-        sentence = sentence.replace('V', 'B').replace('LL', 'Y')
 
         turtle.TurtleScreen._RUNNING=True
         _turtle = turtle.Turtle()
@@ -392,15 +623,15 @@ def generate():
         _turtle.speed(10)
 
         #initial_y = 0
-        words = [DraWord(word, letters, random.randint(1,3), random.randint(10, 30)) for word in sentence.split(' ')]
-        heigh = sum([word.get_distance_from_center(letters)*2 for word in words])
-        width = max([word.get_distance_from_center(letters)*2 for word in words])
+        words = [DraWord(word.split('@')[0].replace('V', 'B').replace('LL', 'Y'), letters, random.randint(1,3), random.randint(10, 30), modifiers = generate_modifiers(word)) for word in sentence.split(' ')]
+        heigh = sum([word.get_distance_from_center(letters, "U")*2 for word in words])
+        width = max([word.get_distance_from_center(letters, "U")*2 for word in words])
         current_x = 0
         current_y = heigh/2
 
         for word in words:
-            word.set_offsets(current_x, current_y - word.get_distance_from_center(letters)).draw_word(_turtle, letters)
-            current_y -= word.get_distance_from_center(letters)*2
+            word.set_offsets(current_x, current_y - word.get_distance_from_center(letters, "U")).draw_word(_turtle, letters)
+            current_y -= word.get_distance_from_center(letters, "U")*2
 
         #
         #t.hide_turtle()
@@ -415,6 +646,7 @@ def generate():
         #_turtle.clear()
         #turtle.bye()
         sentence_window.destroy()
+
     generate_button = tk.Button(
         master=sentence_window,
         text="Generate",
